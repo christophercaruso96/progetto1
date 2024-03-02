@@ -1,0 +1,85 @@
+Schema di rete che contiene oltre al routing richiesto concetti aggiuntivi approfonditi durante le lezioni:
+WLAN -> LAN Wireless gestita dai WLC (Wireless LAN Controller)
+VLAN -> create 2 VLAN 5 (Private) e VLAN 10 (Guest)
+DHCP -> creato un server DHCP per ogni sede che lavora nella VLAN 5 (nella VLAN 10 il DHCP è gestito dal WLC stesso)
+HTTP -> creato un server HTTP(S) per ogni sede che lavora nella VLAN 5
+DNS  -> creato un server DHCP per ogni sede che lavora nella VLAN 5
+
+VLAN
+
+Come si può vedere nello schema è stato implementata una struttura di rete così definita:
+
+SEDE 1 - 192.168.0.0/23
+SEDE 2 - 192.168.2.0/23
+
+VLAN 5 (Private) SEDE 1 -> 192.168.0.1-192.168.0.255 (il broadcast è incluso nella VLAN ma si limita alla prima subnet \24)
+VLAN 10 (Guest) SEDE 1 --> 192.168.1.1-192.168.1.255 (il broadcast è incluso nella VLAN ma si limita alla seconda subnet \24)
+
+VLAN 5 (Private) SEDE 2 -> 192.168.2.1-192.168.2.255 (il broadcast è incluso nella VLAN ma si limita alla prima subnet \24)
+VLAN 10 (Guest) SEDE 2 --> 192.168.3.1-192.168.3.255 (il broadcast è incluso nella VLAN ma si limita alla seconda subnet \24)
+
+In questo caso le VLAN configurate nel layer 2 degli switch, corrispondono nel layer 3 del gateway a 2 LAN distinte in /23 segmentate in 4 subnet /24. 
+
+Per settare le VLAN con routing attivo è stato necessario:
+- layer 2 settare le porte in TRUNK tra gli switch, tra switch e router e in ACCESS verso gli endpoint della rispettiva VLAN
+- layer 3 configurare il router con i tag Dot1Q (serve usare la CLI per vedere le interfacce e le VLAN in completezza. Comandi "show ip interface brief" e "show vlan". Da interfaccia grafica non è visibile questo tipo di configurazione, si può solo consultare il database VLAN).
+
+Di seguito l'output dei comandi:
+
+rt01#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol 
+GigabitEthernet0/0/0   unassigned      YES unset  up                    up 
+GigabitEthernet0/0/0.5 192.168.0.1     YES manual up                    up 
+GigabitEthernet0/0/0.10192.168.1.1     YES manual up                    up 
+GigabitEthernet0/0/1   unassigned      YES unset  up                    down 
+GigabitEthernet0/0/1.5 192.168.2.1     YES manual up                    down 
+GigabitEthernet0/0/1.10192.168.3.1     YES manual up                    down 
+GigabitEthernet0/0/2   unassigned      YES unset  administratively down down 
+Vlan1                  unassigned      YES unset  administratively down down
+
+rt01#show vlan
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    
+5    private                          active    
+10   guest                            active    
+1002 fddi-default                     active    
+1003 token-ring-default               active    
+1004 fddinet-default                  active    
+1005 trnet-default                    active    
+
+
+rt01#show ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2, E - EGP
+       i - IS-IS, L1 - IS-IS level-1, L2 - IS-IS level-2, ia - IS-IS inter area
+       * - candidate default, U - per-user static route, o - ODR
+       P - periodic downloaded static route
+
+Gateway of last resort is not set
+
+     192.168.0.0/24 is variably subnetted, 2 subnets, 2 masks
+C       192.168.0.0/24 is directly connected, GigabitEthernet0/0/0.5
+L       192.168.0.1/32 is directly connected, GigabitEthernet0/0/0.5
+     192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+C       192.168.1.0/24 is directly connected, GigabitEthernet0/0/0.10
+L       192.168.1.1/32 is directly connected, GigabitEthernet0/0/0.10
+
+
+
+Come indicato nello schema della traccia sono stati posizionati due Lightweight Access Point per ogni piano nella 2 sedi, che a discrezione del progettista sono stati divisi in 3 AP per la rete Guest + 3 AP per la rete Private.
+Gli AP sono controllati dai WLC (Wireless LAN Controller) in N. 2 per ogni sede (1 WLC nella VLAN 5 e 1 nella VLAN 10 per ogni sede).
+
+
+
+
+Note Aggiuntive:
+
+1) IL DHCP nelle reti Wireless ci mette un po' di tempo a propagarsi; a tal proposito VIENE SUGGERITO l'uso dei PC di Management collegati direttamente allo switch del datacenter per i test di raggiungibilità tra le subnet segmentate nelle diverse VLAN. 
+
+2) IL routing tra una sede e l'altra funziona correttamente. Le VLAN 5 e 10 nella stessa sede non comunicano (entra in gioco il layer 2) ma con questo tipo di configurazione la VLAN 5 della SEDE 1 può comunicare con la VLAN 10 della SEDE 2, e viceversa (servirebbero ulteriori configurazioni nel layer 3 a livello di routing per inibire questo traffico poichè il router stesso può lavorare su tutte le VLAN interne delle varie sedi e posiziona il corretto TAG DOT1Q nei pacchetti quando li inoltra in rete interna).
+
+3) vista l'introduzione di 4 WLC e la presenza di oltre 240 endpoint tra client e server l'ambiente di simulazione potrebbe non funzionare correttamente con continue saturazioni del buffer.
